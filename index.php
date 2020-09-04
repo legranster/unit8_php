@@ -1,6 +1,5 @@
 <?php
 require_once 'inc/bootstrap.php';
-
 $pageTitle = "Time Tracker";
 $page = null;
 

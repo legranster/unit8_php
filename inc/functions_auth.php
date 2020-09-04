@@ -31,11 +31,19 @@ function saveUserData($user)
 {
     global $session;
     $session->getFlashBag()->add('success', 'Successfully logged in');
-    $data = [
-        'auth_user_id' => (int) $user['id']
-    ];
     $expTime = time() + 3600;
-    $cookie = setAuthCookie($data, $expTime);
+    $jwt = Firebase\JWT\JWT::encode(
+        [
+            'iss' => request()->getBaseUrl(),
+            'sub' => (int) $user['id'],
+            'exp' => $expTime,
+            'iat' => time(),
+            'nbf' => time()
+        ],
+        getenv("SECRET_KEY"),
+        'HS256'
+    );
+    $cookie = setAuthCookie($jwt, $expTime);
     redirect('/', ['cookies' => [$cookie]]);
 }
 
@@ -43,7 +51,7 @@ function setAuthCookie($data, $expTime)
 {
     $cookie = new Symfony\Component\HttpFoundation\Cookie(
         'auth', 
-        json_encode($data),
+        $data,
         $expTime,
         '/',
         'localhost',
@@ -55,12 +63,25 @@ function setAuthCookie($data, $expTime)
 
 function decodeAuthCookie($prop = null)
 {
-    $cookie = json_decode(request()->cookies->get('auth'));
-    if ($prop === null) {
-        return $cookie;
-    }
-    if (!isset($cookie->$prop)){
-        return false;
-    }
-    return $cookie->$prop;
+  try {
+    Firebase\JWT\JWT::$leeway=1;
+    $cookie = Firebase\JWT\JWT::decode(
+      request()->cookies->get('auth'),
+      getenv("SECRET_KEY"),
+      ['HS256']
+    );
+  } catch (Exception $e) {
+    echo $e->getMessage();
+    return false;
+  }
+  if ($prop === null) {
+    return $cookie;
+  }
+  if ($prop == 'auth_user_id') {
+    $prop = 'sub';
+  }
+  if (!isset($cookie->$prop)) {
+    return false;
+  }
+  return $cookie->$prop;
 }
